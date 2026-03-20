@@ -1,8 +1,8 @@
 compile: 
-	cc main.c -ldialog -lncurses -o fpMod 
+	gcc main.c -ldialog -lncurses -o fpMod 
 
 # For compulation on MacOs where libraries are installed via brew
-Mcompile:
+mcompile:
 	gcc main.c -I/opt/homebrew/include -L/opt/homebrew/lib -ldialog -lncurses -o fpMod 
 
 run: 
