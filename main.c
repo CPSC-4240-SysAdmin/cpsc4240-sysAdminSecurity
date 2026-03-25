@@ -21,12 +21,12 @@ typedef struct {
 } fEntry;
 
 typedef struct {
+    // Pointer to next item
+    fsItem* next;
     // The file data
     fEntry file;
     // The length of the list
     int len;
-    // Pointer to next item
-    fsItem* next;
 } fsItem;
 
 // Provides an linked list of all files and directories in pwd
@@ -56,6 +56,7 @@ fEntry* listDir(char* dir) {
             // Iterate over the head of the linked list
             fsItem* head = dirContent;
             while(head != NULL) {
+                head->len++;
                 head = head->next;
             }
 
@@ -88,8 +89,6 @@ fEntry* listDir(char* dir) {
 
     return dirContent;
 }
-
-
 
 int main() {
     int status;
