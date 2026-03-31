@@ -1,10 +1,13 @@
 #include <dialog.h>
-#include <ncurses.h>
+#include <unistd.h>
+#include <errno.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#define MAX_FOLDER_NAME 255
 
 typedef struct fEntry {
     /* The File data */
@@ -32,7 +35,7 @@ fEntry* listDir(char* dir) {
     DIR* workingDir = opendir(dir);
 
     if (workingDir == NULL) {
-        printf("Could not open directory %s", dir);
+        printf("Could not open directory %s with code %d", dir, errno);
         exit(-1);
     }
 
@@ -45,17 +48,17 @@ fEntry* listDir(char* dir) {
         status = stat(file->d_name, &buff);
 
         if (status == -1) {
-            fprintf(stderr, "Error: failed to get status.");
+            fprintf(stderr, "Error: failed to get status of file %s with code %d\n", file->d_name, errno);
             exit(-1);
         }
-
+        
         // If the list is empty, allocate and record the file metadata
         if (dirContent == NULL) {
             dirContent = malloc(sizeof(fEntry));
 
             // Check for malloc errors
             if (dirContent == NULL) {
-                fprintf(stderr, "Error: Failed to allocate memory for head of linked list\n");
+                fprintf(stderr, "Error: Failed to allocate memory for head of linked list with code %d\n", errno);
                 exit(-1);
             }
             // Record linked list data
@@ -92,7 +95,7 @@ fEntry* listDir(char* dir) {
 
             // Check for malloc errors
             if (lNode->next == NULL) {
-                fprintf(stderr, "Error: Failed to allocate memory for node of linked list\n");
+                fprintf(stderr, "Error: Failed to allocate memory for node of linked list with code %d\n", errno);
                 exit(-1);
             }
             // Record linked list data
@@ -125,7 +128,17 @@ char* getFSMenuOption(fEntry* lHead) {
 }
 
 int main() {
-    fEntry* lsDirTest = listDir(".");
+    char *pwd = malloc(MAX_FOLDER_NAME);
+    printf("fpMod starting in directory %s\n", pwd);
+    
+    // Get the current working directory
+    if (getcwd(pwd, MAX_FOLDER_NAME) == NULL) {
+        fprintf(stderr, "Error: Could not read the pwd with code %d\n", errno);
+        exit(-1);
+    }
+
+    // Retrieve and list the files in the current directory
+    fEntry* lsDirTest = listDir(pwd);
     while (lsDirTest != NULL) {
         printf(" - %s\n", lsDirTest->fname);
         printf("    - owner read: %d\n", lsDirTest->ownR);
