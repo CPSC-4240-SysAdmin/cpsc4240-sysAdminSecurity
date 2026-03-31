@@ -6,32 +6,29 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-typedef struct fPerms {
-    bool sticky, setUID, setGID, ownR, ownW, ownX,
-    groupR, groupW, groupX, otherR, otherW, otherX;
-} fPerms;
-
 typedef struct fEntry {
-    // The file's permissions
-    fPerms fperms;
+    /* The File data */
+
     // The file's name
     char* fname;
     // If true, the file is a directory
     bool isDir;
-} fEntry;
+    
+    // The file's permissions
+    bool sticky, setUID, setGID, ownR, ownW, ownX,
+    groupR, groupW, groupX, otherR, otherW, otherX;
 
-typedef struct fsItem {
-    // Pointer to next item
-    struct fsItem* next;
-    // The file data
-    fEntry file;
+    /* The Linked List Data */
+
+    // The next item in the list
+    struct fEntry* next;
     // The length of the list from the current item to the last
     int len;
-} fsItem;
+} fEntry;
 
 // Provides an linked list of all files and directories in pwd
-fsItem* listDir(char* dir) {
-    fsItem* dirContent = NULL;
+fEntry* listDir(char* dir) {
+    fEntry* dirContent = NULL;
     DIR* workingDir = opendir(dir);
 
     if (workingDir == NULL) {
@@ -51,64 +48,84 @@ fsItem* listDir(char* dir) {
             fprintf(stderr, "Error: failed to get status.");
             exit(-1);
         }
-        
-        fsItem* head = dirContent;
-        // If empty allocate first item
-        if (head == NULL) {
-            dirContent = malloc(sizeof(fsItem));
+
+        // If the list is empty, allocate and record the file metadata
+        if (dirContent == NULL) {
+            dirContent = malloc(sizeof(fEntry));
+
+            // Check for malloc errors
+            if (dirContent == NULL) {
+                fprintf(stderr, "Error: Failed to allocate memory for head of linked list\n");
+            }
+            // Record linked list data
             dirContent->len = 1;
             dirContent->next = NULL;
-        }
-        // If not empty, walk to the end of the list and allocate 
+            // Record file metadata
+            dirContent->fname = file->d_name;
+            dirContent->isDir = (buff.st_mode & S_IFDIR);
+            // Record file perms
+            dirContent->sticky = status & S_ISVTX;
+            dirContent->setGID = status & S_ISGID;
+            dirContent->setUID = status & S_ISUID;
+            dirContent->ownR = status & S_IRUSR;
+            dirContent->ownW = status & S_IWUSR;
+            dirContent->ownX = status & S_IXUSR;
+            dirContent->groupR = status & S_IRGRP;
+            dirContent->groupW = status & S_IWGRP;
+            dirContent->groupX = status & S_IXGRP;
+            dirContent->otherR = status & S_IROTH;
+            dirContent->otherW = status & S_IWOTH;
+            dirContent->otherX = status & S_IXOTH;
+        } 
+        // If not, walk to the current end of the list, allocate, then record
         else {
-            while(head->next != NULL) {
-                head->len++;
-                head = head->next;
+
+            fEntry *lNode = dirContent;
+            while (lNode->next != NULL) {
+                // Increment the length
+                lNode->len++;
+                lNode = lNode->next;
             }
 
-            head->next = malloc(sizeof(fsItem));
-            head = head->next;
-            head->next = NULL;
-        }
+            lNode->next = malloc(sizeof(fEntry));
 
-        if (head == NULL) {
-            fprintf(stderr, "Error: malloc call to build the file list failed");
-            exit(-1);
-            
+            // Check for malloc errors
+            if (lNode->next == NULL) {
+                fprintf(stderr, "Error: Failed to allocate memory for node of linked list\n");
+            }
+            // Record linked list data
+            lNode->next->len = 1;
+            lNode->next->next = NULL;
+            // Record file metadata
+            lNode->next->fname = file->d_name;
+            lNode->next->isDir = (buff.st_mode & S_IFDIR);
+            // Record file perms
+            lNode->next->sticky = status & S_ISVTX;
+            lNode->next->setGID = status & S_ISGID;
+            lNode->next->setUID = status & S_ISUID;
+            lNode->next->ownR = status & S_IRUSR;
+            lNode->next->ownW = status & S_IWUSR;
+            lNode->next->ownX = status & S_IXUSR;
+            lNode->next->groupR = status & S_IRGRP;
+            lNode->next->groupW = status & S_IWGRP;
+            lNode->next->groupX = status & S_IXGRP;
+            lNode->next->otherR = status & S_IROTH;
+            lNode->next->otherW = status & S_IWOTH;
+            lNode->next->otherX = status & S_IXOTH;
         }
-
-        // Assign its file name
-        head->file.fname = file->d_name;
-        // Check if its a directory
-        head->file.isDir = (buff.st_mode & S_IFDIR);
-        // Obtain and store the file permissions
-        head->file.fperms.sticky = status & S_ISVTX;
-        head->file.fperms.setGID = status & S_ISGID;
-        head->file.fperms.setUID = status & S_ISUID;
-        head->file.fperms.ownR = status & S_IRUSR;
-        head->file.fperms.ownW = status & S_IWUSR;
-        head->file.fperms.ownX = status & S_IXUSR;
-        head->file.fperms.groupR = status & S_IRGRP;
-        head->file.fperms.groupW = status & S_IWGRP;
-        head->file.fperms.groupX = status & S_IXGRP;
-        head->file.fperms.otherR = status & S_IROTH;
-        head->file.fperms.otherW = status & S_IWOTH;
-        head->file.fperms.otherX = status & S_IXOTH;
         
-    }
-
-    
+    }    
     return dirContent;
 }
 
-char* getFSMenuOption(fsItem* lHead) {
+char* getFSMenuOption(fEntry* lHead) {
 
 }
 
 int main() {
-    fsItem* lsDirTest = listDir(".");
+    fEntry* lsDirTest = listDir(".");
     while (lsDirTest != NULL) {
-        printf(" - %s", lsDirTest->file.fname);
+        printf(" - %s", lsDirTest->fname);
         lsDirTest = lsDirTest->next;
     }
 }
