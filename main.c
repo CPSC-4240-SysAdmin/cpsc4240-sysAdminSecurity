@@ -56,6 +56,7 @@ fEntry* listDir(char* dir) {
             // Check for malloc errors
             if (dirContent == NULL) {
                 fprintf(stderr, "Error: Failed to allocate memory for head of linked list\n");
+                exit(-1);
             }
             // Record linked list data
             dirContent->len = 1;
@@ -92,6 +93,7 @@ fEntry* listDir(char* dir) {
             // Check for malloc errors
             if (lNode->next == NULL) {
                 fprintf(stderr, "Error: Failed to allocate memory for node of linked list\n");
+                exit(-1);
             }
             // Record linked list data
             lNode->next->len = 1;

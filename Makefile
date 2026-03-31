@@ -1,5 +1,5 @@
 compile: 
-	gcc main.c -ldialog -lncurses -o fpMod 
+	gcc main.c -ldialog -lncurses -g -o fpMod 
 
 # For compulation on MacOs where libraries are installed via brew
 mcompile:
