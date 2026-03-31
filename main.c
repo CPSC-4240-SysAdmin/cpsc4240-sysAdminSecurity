@@ -65,18 +65,18 @@ fEntry* listDir(char* dir) {
             dirContent->fname = file->d_name;
             dirContent->isDir = (buff.st_mode & S_IFDIR);
             // Record file perms
-            dirContent->sticky = status & S_ISVTX;
-            dirContent->setGID = status & S_ISGID;
-            dirContent->setUID = status & S_ISUID;
-            dirContent->ownR = status & S_IRUSR;
-            dirContent->ownW = status & S_IWUSR;
-            dirContent->ownX = status & S_IXUSR;
-            dirContent->groupR = status & S_IRGRP;
-            dirContent->groupW = status & S_IWGRP;
-            dirContent->groupX = status & S_IXGRP;
-            dirContent->otherR = status & S_IROTH;
-            dirContent->otherW = status & S_IWOTH;
-            dirContent->otherX = status & S_IXOTH;
+            dirContent->sticky = (buff.st_mode & S_ISVTX) != 0;
+            dirContent->setGID = (buff.st_mode & S_ISGID) != 0;
+            dirContent->setUID = (buff.st_mode & S_ISUID) != 0;
+            dirContent->ownR = (buff.st_mode & S_IRUSR) != 0;
+            dirContent->ownW = (buff.st_mode & S_IWUSR) != 0;
+            dirContent->ownX = (buff.st_mode & S_IXUSR) != 0;
+            dirContent->groupR = (buff.st_mode & S_IRGRP) != 0;
+            dirContent->groupW = (buff.st_mode & S_IWGRP) != 0;
+            dirContent->groupX = (buff.st_mode & S_IXGRP) != 0;
+            dirContent->otherR = (buff.st_mode & S_IROTH) != 0;
+            dirContent->otherW = (buff.st_mode & S_IWOTH) != 0;
+            dirContent->otherX = (buff.st_mode & S_IXOTH) != 0;
         } 
         // If not, walk to the current end of the list, allocate, then record
         else {
@@ -102,18 +102,18 @@ fEntry* listDir(char* dir) {
             lNode->next->fname = file->d_name;
             lNode->next->isDir = (buff.st_mode & S_IFDIR);
             // Record file perms
-            lNode->next->sticky = status & S_ISVTX;
-            lNode->next->setGID = status & S_ISGID;
-            lNode->next->setUID = status & S_ISUID;
-            lNode->next->ownR = status & S_IRUSR;
-            lNode->next->ownW = status & S_IWUSR;
-            lNode->next->ownX = status & S_IXUSR;
-            lNode->next->groupR = status & S_IRGRP;
-            lNode->next->groupW = status & S_IWGRP;
-            lNode->next->groupX = status & S_IXGRP;
-            lNode->next->otherR = status & S_IROTH;
-            lNode->next->otherW = status & S_IWOTH;
-            lNode->next->otherX = status & S_IXOTH;
+            lNode->next->sticky = (buff.st_mode & S_ISVTX) != 0;
+            lNode->next->setGID = (buff.st_mode & S_ISGID) != 0;
+            lNode->next->setUID = (buff.st_mode & S_ISUID) != 0;
+            lNode->next->ownR   = (buff.st_mode & S_IRUSR) != 0;
+            lNode->next->ownW   = (buff.st_mode & S_IWUSR) != 0;
+            lNode->next->ownX   = (buff.st_mode & S_IXUSR) != 0;
+            lNode->next->groupR = (buff.st_mode & S_IRGRP) != 0;
+            lNode->next->groupW = (buff.st_mode & S_IWGRP) != 0;
+            lNode->next->groupX = (buff.st_mode & S_IXGRP) != 0;
+            lNode->next->otherR = (buff.st_mode & S_IROTH) != 0;
+            lNode->next->otherW = (buff.st_mode & S_IWOTH) != 0;
+            lNode->next->otherX = (buff.st_mode & S_IXOTH) != 0;
         }
         
     }    
@@ -127,7 +127,21 @@ char* getFSMenuOption(fEntry* lHead) {
 int main() {
     fEntry* lsDirTest = listDir(".");
     while (lsDirTest != NULL) {
-        printf(" - %s", lsDirTest->fname);
+        printf(" - %s\n", lsDirTest->fname);
+        printf("    - owner read: %d\n", lsDirTest->ownR);
+        printf("    - owner write: %d\n", lsDirTest->ownW);
+        printf("    - owner execute: %d\n", lsDirTest->ownX);
+        printf("    - group read: %d\n", lsDirTest->groupR);
+        printf("    - group write: %d\n", lsDirTest->groupW);
+        printf("    - group execute: %d\n", lsDirTest->groupX);
+        printf("    - other read: %d\n", lsDirTest->otherR);
+        printf("    - other write: %d\n", lsDirTest->otherW);
+        printf("    - other execute: %d\n", lsDirTest->otherX);
+        printf("    - sticky: %d\n", lsDirTest->sticky);
+        printf("    - SetUID: %d\n", lsDirTest->setUID);
+        printf("    - SetGUID: %d\n", lsDirTest->setGID);
+
+
         lsDirTest = lsDirTest->next;
     }
 }
