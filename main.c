@@ -6,12 +6,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-typedef struct {
+typedef struct fPerms {
     bool sticky, setUID, setGID, ownR, ownW, ownX,
     groupR, groupW, groupX, otherR, otherW, otherX;
 } fPerms;
 
-typedef struct {
+typedef struct fEntry {
     // The file's permissions
     fPerms fperms;
     // The file's name
@@ -20,17 +20,17 @@ typedef struct {
     bool isDir;
 } fEntry;
 
-typedef struct {
+typedef struct fsItem {
     // Pointer to next item
-    fsItem* next;
+    struct fsItem* next;
     // The file data
     fEntry file;
-    // The length of the list
+    // The length of the list from the current item to the last
     int len;
 } fsItem;
 
 // Provides an linked list of all files and directories in pwd
-fEntry* listDir(char* dir) {
+fsItem* listDir(char* dir) {
     fsItem* dirContent = NULL;
     DIR* workingDir = opendir(dir);
 
@@ -51,58 +51,64 @@ fEntry* listDir(char* dir) {
             fprintf(stderr, "Error: failed to get status.");
             exit(-1);
         }
-
-        if ((buff.st_mode & S_IFREG) || (buff.st_mode & S_IFDIR)) {
-            // Iterate over the head of the linked list
-            fsItem* head = dirContent;
-            while(head != NULL) {
+        
+        fsItem* head = dirContent;
+        // If empty allocate first item
+        if (head == NULL) {
+            dirContent = malloc(sizeof(fsItem));
+            dirContent->len = 1;
+            dirContent->next = NULL;
+        }
+        // If not empty, walk to the end of the list and allocate 
+        else {
+            while(head->next != NULL) {
                 head->len++;
                 head = head->next;
             }
 
-            head = malloc(sizeof(fsItem));
-
-            if (head == NULL) {
-                fprintf(stderr, "Error: malloc call to build the file list failed");
-                exit(-1);
-            }
-
-            // Assign its file name
-            head->file.fname = file->d_name;
-            // Check if its a directory
-            head->file.isDir = (buff.st_mode & S_IFDIR);
-            // Obtain and store the file permissions
-            head->file.fperms.sticky = status & S_ISVTX;
-            head->file.fperms.setGID = status & S_ISGID;
-            head->file.fperms.setUID = status & S_ISUID;
-            head->file.fperms.ownR = status & S_IRUSR;
-            head->file.fperms.ownW = status & S_IWUSR;
-            head->file.fperms.ownX = status & S_IXUSR;
-            head->file.fperms.groupR = status & S_IRGRP;
-            head->file.fperms.groupW = status & S_IWGRP;
-            head->file.fperms.groupX = status & S_IXGRP;
-            head->file.fperms.otherR = status & S_IROTH;
-            head->file.fperms.otherW = status & S_IWOTH;
-            head->file.fperms.otherX = status & S_IXOTH;
+            head->next = malloc(sizeof(fsItem));
+            head = head->next;
+            head->next = NULL;
         }
+
+        if (head == NULL) {
+            fprintf(stderr, "Error: malloc call to build the file list failed");
+            exit(-1);
+            
+        }
+
+        // Assign its file name
+        head->file.fname = file->d_name;
+        // Check if its a directory
+        head->file.isDir = (buff.st_mode & S_IFDIR);
+        // Obtain and store the file permissions
+        head->file.fperms.sticky = status & S_ISVTX;
+        head->file.fperms.setGID = status & S_ISGID;
+        head->file.fperms.setUID = status & S_ISUID;
+        head->file.fperms.ownR = status & S_IRUSR;
+        head->file.fperms.ownW = status & S_IWUSR;
+        head->file.fperms.ownX = status & S_IXUSR;
+        head->file.fperms.groupR = status & S_IRGRP;
+        head->file.fperms.groupW = status & S_IWGRP;
+        head->file.fperms.groupX = status & S_IXGRP;
+        head->file.fperms.otherR = status & S_IROTH;
+        head->file.fperms.otherW = status & S_IWOTH;
+        head->file.fperms.otherX = status & S_IXOTH;
+        
     }
 
+    
     return dirContent;
 }
 
-int main() {
-    int status;
-    char* options[] = {"op1", "op2", "op3", "op4", "op5"};
-    init_dialog(stdin, stdout);
-    status = dialog_menu(
-        "fpMod",
-        "choose a file/directory",
-        0, 0, 25,
-        5,
-        options
-    );
-    
-    end_dialog();
+char* getFSMenuOption(fsItem* lHead) {
 
-    return status;
+}
+
+int main() {
+    fsItem* lsDirTest = listDir(".");
+    while (lsDirTest != NULL) {
+        printf(" - %s", lsDirTest->file.fname);
+        lsDirTest = lsDirTest->next;
+    }
 }
