@@ -6,8 +6,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #define MAX_FOLDER_NAME 255
+#define PERMISSION_LEN 11
 
 typedef struct fEntry {
     /* The File data */
@@ -64,9 +66,13 @@ fEntry* listDir(char* dir) {
             // Record linked list data
             dirContent->len = 1;
             dirContent->next = NULL;
-            // Record file metadata
-            dirContent->fname = file->d_name;
-            dirContent->isDir = (buff.st_mode & S_IFDIR);
+            // Record file metadata (copy name; file->d_name is reused by readdir)
+            dirContent->fname = strdup(file->d_name);
+            if (dirContent->fname == NULL) {
+                fprintf(stderr, "Error: strdup failed for file name\n");
+                exit(-1);
+            }
+            dirContent->isDir = S_ISDIR(buff.st_mode);
             // Record file perms
             dirContent->sticky = (buff.st_mode & S_ISVTX) != 0;
             dirContent->setGID = (buff.st_mode & S_ISGID) != 0;
@@ -101,9 +107,13 @@ fEntry* listDir(char* dir) {
             // Record linked list data
             lNode->next->len = 1;
             lNode->next->next = NULL;
-            // Record file metadata
-            lNode->next->fname = file->d_name;
-            lNode->next->isDir = (buff.st_mode & S_IFDIR);
+            // Record file metadata (copy name; file->d_name is reused by readdir)
+            lNode->next->fname = strdup(file->d_name);
+            if (lNode->next->fname == NULL) {
+                fprintf(stderr, "Error: strdup failed for file name\n");
+                exit(-1);
+            }
+            lNode->next->isDir = S_ISDIR(buff.st_mode);
             // Record file perms
             lNode->next->sticky = (buff.st_mode & S_ISVTX) != 0;
             lNode->next->setGID = (buff.st_mode & S_ISGID) != 0;
@@ -123,8 +133,93 @@ fEntry* listDir(char* dir) {
     return dirContent;
 }
 
-char* getFSMenuOption(fEntry* lHead) {
+// returns string of symbolic permissions of the particular file f
+// Ex. drwxr--r-- means its directory with owner rwx and g and other only r
+// for the setUID and sticky representation
+// see https://en.wikipedia.org/wiki/File-system_permissions#Symbolic_notation
+// for better explanation.
+char* getFilePermisionsString(fEntry f){
+    static char permissions[PERMISSION_LEN];
 
+    memcpy(permissions, "----------\0", sizeof(permissions));
+    if (f.isDir){
+        permissions[0] = 'd';
+    }
+    if (f.ownR){
+        permissions[1] = 'r';
+    }
+    if (f.ownW){
+        permissions[2] = 'w';
+    }
+    if (f.ownX && !f.setUID){
+        permissions[3] = 'x';
+    }
+    if (f.ownX && f.setUID){
+        permissions[3] = 's';
+    }
+    if (!f.ownX && f.setUID){
+        permissions[3] = 'S';
+    }
+    if (f.groupR){
+        permissions[4] = 'r';
+    }
+    if (f.groupW){
+        permissions[5] = 'w';
+    }
+    if (f.groupX && !f.setGID){
+        permissions[6] = 'x';
+    }
+    if (f.groupX && f.setGID){
+        permissions[6] = 's';
+    }
+    if (!f.groupX && f.setGID){
+        permissions[6] = 'S';
+    }
+    if (f.otherR){
+        permissions[7] = 'r';
+    }
+    if (f.otherW){
+        permissions[8] = 'w';
+    }
+    if (f.otherX && !f.sticky){
+        permissions[9] = 'x';
+    }
+    if (f.otherX && f.sticky){
+        permissions[9] = 't';
+    }
+    if (!f.otherX && f.sticky){
+        permissions[9] = 'T';
+    }
+    return permissions;
+
+}
+
+// Returns string Format of 
+// "file 1 name", "file 1 permissions", ... so on n times
+// n is amount of files in list
+char** getFSMenuOption(fEntry* lHead) {
+    
+    int numFiles = 0;//lsDirTest->len;
+    for (fEntry* p = lHead; p != NULL; p = p->next) {
+        numFiles++;
+    }
+    char** menuOpts = malloc(2 * numFiles * sizeof(char*));
+    if (menuOpts == NULL && numFiles > 0) {
+        fprintf(stderr, "Error: malloc failed for menu options\n");
+        exit(-1);
+    }
+    int i = 0; 
+    fEntry *tmp = lHead;
+    while (tmp != NULL){
+        char fileName[MAX_FOLDER_NAME + 1]; 
+           
+        sprintf(fileName, "%s", tmp->fname); 
+        menuOpts[i * 2] = strdup(fileName);
+        menuOpts[i * 2 + 1] = strdup(getFilePermisionsString(*tmp));
+        i++;
+        tmp = tmp->next;
+    }
+    return menuOpts;
 }
 
 int main() {
@@ -139,22 +234,43 @@ int main() {
 
     // Retrieve and list the files in the current directory
     fEntry* lsDirTest = listDir(pwd);
-    while (lsDirTest != NULL) {
-        printf(" - %s\n", lsDirTest->fname);
-        printf("    - owner read: %d\n", lsDirTest->ownR);
-        printf("    - owner write: %d\n", lsDirTest->ownW);
-        printf("    - owner execute: %d\n", lsDirTest->ownX);
-        printf("    - group read: %d\n", lsDirTest->groupR);
-        printf("    - group write: %d\n", lsDirTest->groupW);
-        printf("    - group execute: %d\n", lsDirTest->groupX);
-        printf("    - other read: %d\n", lsDirTest->otherR);
-        printf("    - other write: %d\n", lsDirTest->otherW);
-        printf("    - other execute: %d\n", lsDirTest->otherX);
-        printf("    - sticky: %d\n", lsDirTest->sticky);
-        printf("    - SetUID: %d\n", lsDirTest->setUID);
-        printf("    - SetGUID: %d\n", lsDirTest->setGID);
+    // Gathering file names in menu string array format
+    // Need size for the menu
+    char** menuOpts = getFSMenuOption(lsDirTest);
+    int menuSize = sizeof(menuOpts);
 
+    // Dialog File Select
+    printf("%d\n", menuSize);
+    int status;
+    dialog_state.use_colors = 1;
+	init_dialog(stdin, stdout);
+    
+    init_pair(50, COLOR_BLACK, COLOR_WHITE);
+    init_pair(51, COLOR_WHITE, COLOR_BLUE);
 
-        lsDirTest = lsDirTest->next;
+    item_attr = COLOR_PAIR(50);           
+    tag_attr = COLOR_PAIR(50) | A_BOLD;  
+    
+    item_selected_attr = COLOR_PAIR(51);
+    tag_selected_attr = COLOR_PAIR(51) | A_BOLD;
+
+    // Make the highlighted hotkey match the highlighted tag text
+    tag_key_attr = tag_attr; 
+    tag_key_selected_attr = tag_selected_attr;
+	status = dialog_menu(
+			"File Selection",
+			"Please Select File or Directory to Change Permissions",
+			0, 
+            0,
+            0,
+            menuSize,
+            menuOpts
+    );
+	end_dialog();
+
+    //Freeing the 
+    for (int y = 0; y < 2 * menuSize; y++) {
+        free(menuOpts[y]);
     }
+    free(menuOpts);
 }
