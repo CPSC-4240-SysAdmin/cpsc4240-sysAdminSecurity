@@ -222,6 +222,60 @@ char** getFSMenuOption(fEntry* lHead) {
     return menuOpts;
 }
 
+char* selectFile(char** menuOpts, int menuSize){
+    int status;
+    dialog_state.use_colors = 1;
+	init_dialog(stdin, stdout);
+    tag_key_attr = tag_attr; 
+    tag_key_selected_attr = tag_selected_attr;
+	status = dialog_menu(
+			"File Selection",
+			"Please Select File or Directory to Change Permissions",
+			0, 
+            0,
+            0,
+            menuSize,
+            menuOpts
+    );
+	end_dialog();
+    // Outupt of the menu
+    return dialog_vars.input_result;
+
+}
+
+//TODO: 
+// Get file name from fEntry pwd list of files.
+// from the filename string
+fEntry getFEntryFromString(char* fileName){
+    return NULL;
+}
+
+
+//TODO:
+//create a dialog checklist that shows indivudal seperate permissions
+    /*
+    *
+    *ur                 []
+    *uw                 [*]
+    *ux                 []
+    *gr                 [*]
+    *special Permissions[]
+    */
+// Make sure it actually changes the file permissions
+void checklistPermissions(fEntry* file){
+    
+}
+
+//TODO:
+// Go into the directroy of the file
+// Maybe check if it is dir but 
+void goIntoDir(fEntry* file){
+
+
+}
+
+
+
 int main() {
     char *pwd = malloc(MAX_FOLDER_NAME);
     printf("fpMod starting in directory %s\n", pwd);
@@ -239,36 +293,31 @@ int main() {
     char** menuOpts = getFSMenuOption(lsDirTest);
     int menuSize = sizeof(menuOpts);
 
-    // Dialog File Select
-    printf("%d\n", menuSize);
-    int status;
-    dialog_state.use_colors = 1;
-	init_dialog(stdin, stdout);
+    char* outputFile = selectFile(menuOpts, menuSize);
+
+
+    ///THE FLOW
+    //fEntry selectedFile = getFEntryFromString(outputFile);
+    /*
+    while(cancel not selected){
+        fEntry* lsHead = lsDir(pwd)
+        char** menuOpts = getFSMenuOption(lsHead);
+        int menuSize = sizeof(menuOpts);
+        char* fileName = selectFile(menuOpts, menuSize); //creates the menu
+        fEntry selectedFile = getFEntryFromString(fileName);
+        if (selectedFile->isDir && selectedFile->fname != "."){
+            //Enter Directory
+            // goIntoDir(nameOfDir)
+        }
+        else{
+            // Permissions checklist
+            // checklistPermissions(file)
+        }
+        free(BOTH fEntry and menuOpts)
+    }
+    */
     
-    init_pair(50, COLOR_BLACK, COLOR_WHITE);
-    init_pair(51, COLOR_WHITE, COLOR_BLUE);
 
-    item_attr = COLOR_PAIR(50);           
-    tag_attr = COLOR_PAIR(50) | A_BOLD;  
-    
-    item_selected_attr = COLOR_PAIR(51);
-    tag_selected_attr = COLOR_PAIR(51) | A_BOLD;
-
-    // Make the highlighted hotkey match the highlighted tag text
-    tag_key_attr = tag_attr; 
-    tag_key_selected_attr = tag_selected_attr;
-	status = dialog_menu(
-			"File Selection",
-			"Please Select File or Directory to Change Permissions",
-			0, 
-            0,
-            0,
-            menuSize,
-            menuOpts
-    );
-	end_dialog();
-
-    //Freeing the 
     for (int y = 0; y < 2 * menuSize; y++) {
         free(menuOpts[y]);
     }
