@@ -246,7 +246,7 @@ char* selectFile(char** menuOpts, int menuSize){
 //TODO: 
 // Get file name from fEntry pwd list of files.
 // from the filename string
-fEntry getFEntryFromString(char* fileName){
+fEntry* getFEntryFromString(char* fileName){
     return NULL;
 }
 
