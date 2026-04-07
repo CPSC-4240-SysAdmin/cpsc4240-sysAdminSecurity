@@ -274,7 +274,42 @@ fEntry* getFEntryFromString(char* fileName){
     */
 // Make sure it actually changes the file permissions
 void checklistPermissions(fEntry* file){
-    
+
+    char* permList[] = {
+        "OR", "Owner Read", file->ownR ? "on" : "off",
+        "OW", "Owner Write", file->ownW ? "on" : "off",
+        "OX", "Owner Execute", file->ownX ? "on" : "off",
+        "GR", "Group Read", file->groupR ? "on" : "off",
+        "GW", "Group Write", file->groupW ? "on" : "off",
+        "GX", "Group Execute", file->groupX ? "on" : "off",
+        "TR", "Other Read", file->otherR ? "on" : "off",
+        "TW", "Other Write", file->otherW ? "on" : "off",
+        "TX", "Other Execute", file->otherX ? "on" : "off",
+        "SU", "SetUID", file->setUID ? "on" : "off",
+        "SG", "SetGID", file->setGID ? "on" : "off",
+        "ST", "Sticky", file->sticky ? "on" : "off"
+    };
+    // Ask the user via checkbox dialog to set file perms they want
+
+    char dialogTitle[MAX_FOLDER_NAME + 24];
+    snprintf(dialogTitle, MAX_FOLDER_NAME + 24, "Setting Permissions for %s", file->fname);
+
+    int status;
+    dialog_state.use_colors = 1;
+	init_dialog(stdin, stdout);
+    tag_key_attr = tag_attr; 
+    tag_key_selected_attr = tag_selected_attr;
+	status = dialog_checklist(
+			dialogTitle,
+			"Navigate list: Up and Down Arrows\nEnable a permission: Right Arrow\nDisable permission: Left Arrow",
+			0, 
+            0,
+            12,
+            PERMISSION_LEN+1,
+            permList,
+            0
+    );
+	end_dialog();
 }
 
 //TODO:
