@@ -3,7 +3,7 @@ compile:
 
 # For compulation on MacOs where libraries are installed via brew
 mcompile:
-	gcc main.c -I/opt/homebrew/include -L/opt/homebrew/lib -ldialog -lncurses -o fpMod 
+	gcc main.c -I/opt/homebrew/include -L/opt/homebrew/lib -ldialog -lncurses -g -o fpMod 
 
 run: 
 	./fpMod
