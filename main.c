@@ -321,7 +321,24 @@ void checklistPermissions(fEntry* file){
     // Set the file's permissions to match their choices
 
     mode_t newPerms = 0;
+    // Set owner
     newPerms += strstr(dialog_vars.input_result, "OR") ? S_IRUSR : 0; 
+    newPerms += strstr(dialog_vars.input_result, "OW") ? S_IWUSR : 0; 
+    newPerms += strstr(dialog_vars.input_result, "OX") ? S_IWUSR : 0; 
+    // Set group
+    newPerms += strstr(dialog_vars.input_result, "GR") ? S_IRGRP : 0; 
+    newPerms += strstr(dialog_vars.input_result, "GW") ? S_IWGRP : 0; 
+    newPerms += strstr(dialog_vars.input_result, "GX") ? S_IXGRP : 0; 
+    // Set other
+    newPerms += strstr(dialog_vars.input_result, "TR") ? S_IROTH : 0; 
+    newPerms += strstr(dialog_vars.input_result, "TW") ? S_IWOTH : 0; 
+    newPerms += strstr(dialog_vars.input_result, "TX") ? S_IXOTH : 0; 
+    // Set special
+    newPerms += strstr(dialog_vars.input_result, "SU") ? S_ISUID : 0; 
+    newPerms += strstr(dialog_vars.input_result, "SG") ? S_ISGID : 0; 
+    newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
+
+    chmod(file->fname, newPerms);
 
 }
 
