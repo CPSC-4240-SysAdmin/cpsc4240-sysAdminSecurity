@@ -96,7 +96,7 @@ fEntry* listDir(char* dir) {
                 lNode->len++;
                 lNode = lNode->next;
             }
-
+            lNode->len++;
             lNode->next = malloc(sizeof(fEntry));
 
             // Check for malloc errors
