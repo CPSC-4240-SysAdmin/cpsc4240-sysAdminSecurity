@@ -300,10 +300,10 @@ int main() {
     }
 
     // Retrieve and list the files in the current directory
-    fEntry* lsDirTest = listDir(pwd);
+    fEntry* dirContents = listDir(pwd);
     // Gathering file names in menu string array format
     // Need size for the menu
-    char** menuOpts = getFSMenuOption(lsDirTest);
+    char** menuOpts = getFSMenuOption(dirContents);
     int menuSize = sizeof(menuOpts);
 
     char* outputFile = selectFile(menuOpts, menuSize);
@@ -337,6 +337,6 @@ int main() {
 
     // Free menu outputs, file list contents, and working directory buffer
     free(menuOpts);
-    freeListDir(lsDirTest);
+    freeListDir(dirContents);
     free(pwd);
 }
