@@ -9,7 +9,7 @@
 #include <string.h>
 
 #define MAX_FOLDER_NAME 255
-#define PERMISSION_LEN 11
+#define PERMISSION_LEN 12
 
 typedef struct fEntry {
     /* The File data */
@@ -254,10 +254,17 @@ char* selectFile(char** menuOpts, int menuSize){
 
 }
 
-//TODO: 
-// Get file name from fEntry pwd list of files.
-// from the filename string
-fEntry* getFEntryFromString(char* fileName){
+// Returns an fEntry in list dirContent whose fname matches fileName
+fEntry* getFEntryFromString(fEntry* dirContent, char* fileName){
+
+    fEntry* head = dirContent;
+    while (head != NULL) {
+        if (strcmp(head->fname, fileName) == 0) {
+            return head;
+        }
+        head = head->next;
+    }
+
     return NULL;
 }
 
@@ -301,15 +308,21 @@ void checklistPermissions(fEntry* file){
     tag_key_selected_attr = tag_selected_attr;
 	status = dialog_checklist(
 			dialogTitle,
-			"Navigate list: Up and Down Arrows\nEnable a permission: Right Arrow\nDisable permission: Left Arrow",
+			"Navigate list: Up and Down Arrows\n Enable/Disable Permission: Space",
 			0, 
             0,
             12,
-            PERMISSION_LEN+1,
+            PERMISSION_LEN,
             permList,
-            0
+            FLAG_CHECK
     );
 	end_dialog();
+
+    // Set the file's permissions to match their choices
+
+    mode_t newPerms = 0;
+    newPerms += strstr(dialog_vars.input_result, "OR") ? S_IRUSR : 0; 
+
 }
 
 //TODO:
@@ -340,7 +353,7 @@ int main() {
     int menuSize = sizeof(menuOpts);
 
     char* outputFile = selectFile(menuOpts, menuSize);
-
+    checklistPermissions(getFEntryFromString(dirContents, outputFile));
 
     ///THE FLOW
     //fEntry selectedFile = getFEntryFromString(outputFile);
