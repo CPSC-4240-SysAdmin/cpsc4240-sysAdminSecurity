@@ -367,7 +367,7 @@ int main() {
     // Gathering file names in menu string array format
     // Need size for the menu
     char** menuOpts = getFSMenuOption(dirContents);
-    int menuSize = sizeof(menuOpts);
+    int menuSize = dirContents->len;
 
     char* outputFile = selectFile(menuOpts, menuSize);
     checklistPermissions(getFEntryFromString(dirContents, outputFile));
