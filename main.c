@@ -324,7 +324,7 @@ void checklistPermissions(fEntry* file){
     // Set owner
     newPerms += strstr(dialog_vars.input_result, "OR") ? S_IRUSR : 0; 
     newPerms += strstr(dialog_vars.input_result, "OW") ? S_IWUSR : 0; 
-    newPerms += strstr(dialog_vars.input_result, "OX") ? S_IWUSR : 0; 
+    newPerms += strstr(dialog_vars.input_result, "OX") ? S_IXUSR : 0; 
     // Set group
     newPerms += strstr(dialog_vars.input_result, "GR") ? S_IRGRP : 0; 
     newPerms += strstr(dialog_vars.input_result, "GW") ? S_IWGRP : 0; 
