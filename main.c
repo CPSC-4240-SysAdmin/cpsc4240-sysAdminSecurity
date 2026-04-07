@@ -133,6 +133,19 @@ fEntry* listDir(char* dir) {
     return dirContent;
 }
 
+// Frees memory allocated by listDir
+void freeListDir(fEntry* head) {
+    fEntry *current = head;
+    fEntry *next = current->next;
+
+    while (next != NULL) {
+        free(current);
+        current = next;
+        next = next->next;
+    }
+    free(current);
+}
+
 // returns string of symbolic permissions of the particular file f
 // Ex. drwxr--r-- means its directory with owner rwx and g and other only r
 // for the setUID and sticky representation
@@ -321,6 +334,9 @@ int main() {
     for (int y = 0; y < 2 * menuSize; y++) {
         free(menuOpts[y]);
     }
+
+    // Free menu outputs, file list contents, and working directory buffer
     free(menuOpts);
-    
+    freeListDir(lsDirTest);
+    free(pwd);
 }
