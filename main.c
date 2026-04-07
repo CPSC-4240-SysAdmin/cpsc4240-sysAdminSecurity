@@ -322,4 +322,5 @@ int main() {
         free(menuOpts[y]);
     }
     free(menuOpts);
+    
 }
