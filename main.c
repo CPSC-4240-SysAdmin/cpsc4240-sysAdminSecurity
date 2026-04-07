@@ -212,10 +212,8 @@ char* getFilePermisionsString(fEntry f){
 // n is amount of files in list
 char** getFSMenuOption(fEntry* lHead) {
     
-    int numFiles = 0;//lsDirTest->len;
-    for (fEntry* p = lHead; p != NULL; p = p->next) {
-        numFiles++;
-    }
+    int numFiles = lHead->len;
+
     char** menuOpts = malloc(2 * numFiles * sizeof(char*));
     if (menuOpts == NULL && numFiles > 0) {
         fprintf(stderr, "Error: malloc failed for menu options\n");
@@ -270,7 +268,7 @@ fEntry* getFEntryFromString(char* fileName){
     *
     *ur                 []
     *uw                 [*]
-    *ux                 []
+    *ux                 []f
     *gr                 [*]
     *special Permissions[]
     */
