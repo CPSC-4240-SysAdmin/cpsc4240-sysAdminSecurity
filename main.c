@@ -9,6 +9,7 @@
 #include <string.h>
 
 #define MAX_FOLDER_NAME 255
+#define MAX_PATH_LENGTH 4096
 #define PERMISSION_LEN 12
 
 typedef struct fEntry {
@@ -130,6 +131,7 @@ fEntry* listDir(char* dir) {
         }
         
     }    
+    closedir(workingDir);
     return dirContent;
 }
 
@@ -233,19 +235,22 @@ char** getFSMenuOption(fEntry* lHead) {
     return menuOpts;
 }
 
-char* selectFile(char** menuOpts, int menuSize){
+char* selectFile(char** menuOpts, char* folderName){
     int status;
     dialog_state.use_colors = 1;
+    char folderBuf[MAX_FOLDER_NAME];
+    snprintf(folderBuf, sizeof(folderBuf), "Select file or directory from\n%s", folderName);
+    dlg_clr_result();
 	init_dialog(stdin, stdout);
     tag_key_attr = tag_attr; 
     tag_key_selected_attr = tag_selected_attr;
 	status = dialog_menu(
-			"File Selection",
-			"Please Select File or Directory to Change Permissions",
+			"Selection",
+			folderBuf,
 			0, 
             0,
             0,
-            menuSize,
+            sizeof(menuOpts),
             menuOpts
     );
 	end_dialog();
@@ -280,7 +285,8 @@ fEntry* getFEntryFromString(fEntry* dirContent, char* fileName){
     *special Permissions[]
     */
 // Make sure it actually changes the file permissions
-void checklistPermissions(fEntry* file){
+// returns status of checklist (ok 0, cancel 1, or espace 255)
+int checklistPermissions(fEntry* file){
 
     char* permList[] = {
         "OR", "Owner Read", file->ownR ? "on" : "off",
@@ -303,6 +309,7 @@ void checklistPermissions(fEntry* file){
 
     int status;
     dialog_state.use_colors = 1;
+    dlg_clr_result();
 	init_dialog(stdin, stdout);
     tag_key_attr = tag_attr; 
     tag_key_selected_attr = tag_selected_attr;
@@ -319,6 +326,7 @@ void checklistPermissions(fEntry* file){
 	end_dialog();
 
     // Set the file's permissions to match their choices
+        
 
     mode_t newPerms = 0;
     // Set owner
@@ -339,6 +347,7 @@ void checklistPermissions(fEntry* file){
     newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
 
     chmod(file->fname, newPerms);
+    return status;
 
 }
 
@@ -351,9 +360,42 @@ void goIntoDir(fEntry* file){
 }
 
 
+void freeMenuOpts(char** menuOpts){
+    for (int i = 0; i < sizeof(menuOpts); i++){
+        free(menuOpts[i]);
+    }
+    free(menuOpts);
+}
+
+void freelsDir(fEntry* lHead){
+
+
+}
+
+//Takes a path and returns the end most folder (or file)
+//Ex:
+// getCurrentFolder(/Users/alex/Desktop/work) returns work
+char* getCurrentFolder(char* folderPath){
+    return strrchr(folderPath, '/') + 1; 
+}
+
+//Takes path and returns the same path but with just the parent
+//Ex:
+//  getParentPath(/Users/alex/Desktop/work) returns /Users/alex/Desktop
+/*
+char* getParentPath(char* folderPath){
+    int end = strrchr(folderPath, '/') - folderPath;
+    char ans[end+1];
+    strncpy(ans, folderPath, end);     
+    ans[end+1] = '\0';
+    return ans;
+}
+*/
+
 
 int main() {
-    char *pwd = malloc(MAX_FOLDER_NAME);
+    /*
+    char *pwd = malloc(MAX_PATH_LENGTH);
     printf("fpMod starting in directory %s\n", pwd);
     
     // Get the current working directory
@@ -371,35 +413,47 @@ int main() {
 
     char* outputFile = selectFile(menuOpts, menuSize);
     checklistPermissions(getFEntryFromString(dirContents, outputFile));
+    */
 
     ///THE FLOW
-    //fEntry selectedFile = getFEntryFromString(outputFile);
-    /*
-    while(cancel not selected){
-        fEntry* lsHead = lsDir(pwd)
-        char** menuOpts = getFSMenuOption(lsHead);
-        int menuSize = sizeof(menuOpts);
-        char* fileName = selectFile(menuOpts, menuSize); //creates the menu
-        fEntry selectedFile = getFEntryFromString(fileName);
-        if (selectedFile->isDir && selectedFile->fname != "."){
-            //Enter Directory
-            // goIntoDir(nameOfDir)
-        }
-        else{
-            // Permissions checklist
-            // checklistPermissions(file)
-        }
-        free(BOTH fEntry and menuOpts)
+   
+    char *pwd = malloc(MAX_PATH_LENGTH);
+    if (getcwd(pwd, MAX_PATH_LENGTH) == NULL) {
+        fprintf(stderr, "Error: Could not read the pwd with code %d\n", errno);
+        exit(-1);
     }
-    */
-    
-
-    for (int y = 0; y < 2 * menuSize; y++) {
-        free(menuOpts[y]);
+    fEntry* lsHead = listDir(pwd);
+    char** menuOpts = getFSMenuOption(lsHead);
+    char* fileName = malloc(MAX_FOLDER_NAME);
+    char* folderName = malloc(MAX_FOLDER_NAME);
+    while(1){
+        strcpy(folderName, getCurrentFolder(pwd));
+        strcpy(fileName,selectFile(menuOpts, folderName)); //creates the menu
+        printf("%s\n", fileName); 
+        if (fileName == NULL){ //User selects cancel
+            printf("Exited\n");
+            break;
+        }
+ 
+        
+        fEntry* selectedFile = getFEntryFromString(lsHead, fileName);
+ 
+        if (!selectedFile->isDir){ //User selects file
+            int result = checklistPermissions(selectedFile);
+            printf("%s\n", dialog_vars.input_result);
+        }
+        if (selectedFile->isDir && !strcmp(selectedFile->fname, ".")){// User Selects Current Dir
+            // Parse the pwd to get just the name fo current dir
+            checklistPermissions(getFEntryFromString(lsHead, "."));
+        }
+        else{ //User selects a dir (go into that dir) (if .. go up a dir)
+            // change pwd to absoloute path of parent
+            //closedir(lsDir);
+            freeMenuOpts(menuOpts);
+            lsHead = listDir(pwd);
+            menuOpts = getFSMenuOption(lsHead);
+        }
     }
+    return 0;
 
-    // Free menu outputs, file list contents, and working directory buffer
-    free(menuOpts);
-    freeListDir(dirContents);
-    free(pwd);
 }
