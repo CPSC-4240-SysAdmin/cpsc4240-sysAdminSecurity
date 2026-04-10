@@ -8,15 +8,28 @@
 #include <stdio.h>
 #include <string.h>
 
-#define MAX_FOLDER_NAME 255
+#define MAX_FOLDER_NAME 256 //The maximum length a name can be for a file or directory +1
 #define MAX_PATH_LENGTH 4096
 #define PERMISSION_LEN 12
 
+int dialog_status;
+
+typedef enum {
+    MENU_STATE,
+    CHECKLIST_STATE,
+    QUIT_STATE
+} DialogState;
+
+
+// Is a linked list of all hidden files and directories within a 
+// particular directory. 
+// Stores the name of the file, if its a directory and other permissions about it
 typedef struct fEntry {
     /* The File data */
 
     // The file's name
-    char* fname;
+    char fname[MAX_FOLDER_NAME];
+
     // If true, the file is a directory
     bool isDir;
     
@@ -24,129 +37,179 @@ typedef struct fEntry {
     bool sticky, setUID, setGID, ownR, ownW, ownX,
     groupR, groupW, groupX, otherR, otherW, otherX;
 
-    /* The Linked List Data */
-
     // The next item in the list
     struct fEntry* next;
-    // The length of the list from the current item to the last
-    int len;
+
 } fEntry;
 
-// Provides an linked list of all files and directories in pwd
-fEntry* listDir(char* dir) {
-    fEntry* dirContent = NULL;
-    DIR* workingDir = opendir(dir);
 
-    if (workingDir == NULL) {
-        printf("Could not open directory %s with code %d", dir, errno);
+// Stores the pointer to the linked list of 
+// files within the directory along with the name of the directory
+// and amount of files/subdirectories within it (minus the "." and ".." dir)
+// (Will include all hidden files and subdirectories)
+typedef struct dirEntry {
+    //Directory name
+    char dirName[MAX_FOLDER_NAME];
+
+    // num of ALL files/subdirs
+    int len;
+    
+    // Pointer to start of fEntry linked list
+    struct fEntry* start;
+
+
+} dirEntry;
+
+
+// Global current directory 
+dirEntry currentDir;
+
+
+//Takes a path and returns the end most folder (or file)
+//Ex:
+// getCurrentFolder(/Users/alex/Desktop/work) returns work
+char* getCurrentFolder(char* folderPath){
+    char* currentFolder = (char*)malloc(sizeof(char)*MAX_FOLDER_NAME);
+    if (currentFolder == NULL) {
+        fprintf(stderr, "Error: Failed to allocate memory for head of linked list with code %d\n", errno);
         exit(-1);
     }
+    currentFolder = strrchr(folderPath, '/');
+    if (currentFolder != NULL) {
+        return currentFolder + 1;
+    }
+    return currentFolder; 
+}
 
+
+// Free's the fEntry Linked list in current Dir
+void freeDirEntry() {
+    fEntry *temp = currentDir.start;
+    while (currentDir.start != NULL) {
+        temp = currentDir.start;
+        currentDir.start = currentDir.start->next;
+        free(temp);
+    }
+    currentDir.len = 0;
+}
+
+// Updates the currentDir based on the pwd 
+// pwd is a string of the absoloute path
+void updateDirEntry(char* pwd) {
+
+    // Opening current directory
+    DIR* workingDir = opendir(pwd);
+    // Declaring struct to point to files/dirs within directory
     struct dirent* file;
-    // Read each entry an create an fEntry for each
-    while ((file = readdir(workingDir))) {
-        struct stat buff;
-        int status;
 
-        status = stat(file->d_name, &buff);
 
-        if (status == -1) {
-            fprintf(stderr, "Error: failed to get status of file %s with code %d\n", file->d_name, errno);
+    // Free the fEntry linked list that dirEntry points to to make room for a new one
+    freeDirEntry(); 
+
+    // Initializing to an empty Current directory
+    strncpy(currentDir.dirName, getCurrentFolder(pwd), MAX_FOLDER_NAME);
+    fEntry* dirContent = NULL;
+
+
+    // Our traversal node to append more nodes
+    fEntry* currentFile;
+
+    // Checking if we have permisions to open 
+    if (workingDir == NULL) {
+        if (errno == EACCES) {
+            printf("Error: Permission denied!\n");
+            exit(-1);
+        } else if (errno == ENOENT) {
+            printf("Error: Directory does not exist!\n");
             exit(-1);
         }
-        
-        // If the list is empty, allocate and record the file metadata
-        if (dirContent == NULL) {
-            dirContent = malloc(sizeof(fEntry));
+    }
 
-            // Check for malloc errors
-            if (dirContent == NULL) {
-                fprintf(stderr, "Error: Failed to allocate memory for head of linked list with code %d\n", errno);
-                exit(-1);
-            }
-            // Record linked list data
-            dirContent->len = 1;
-            dirContent->next = NULL;
-            // Record file metadata (copy name; file->d_name is reused by readdir)
-            dirContent->fname = strdup(file->d_name);
-            if (dirContent->fname == NULL) {
-                fprintf(stderr, "Error: strdup failed for file name\n");
-                exit(-1);
-            }
-            dirContent->isDir = S_ISDIR(buff.st_mode);
-            // Record file perms
-            dirContent->sticky = (buff.st_mode & S_ISVTX) != 0;
-            dirContent->setGID = (buff.st_mode & S_ISGID) != 0;
-            dirContent->setUID = (buff.st_mode & S_ISUID) != 0;
-            dirContent->ownR = (buff.st_mode & S_IRUSR) != 0;
-            dirContent->ownW = (buff.st_mode & S_IWUSR) != 0;
-            dirContent->ownX = (buff.st_mode & S_IXUSR) != 0;
-            dirContent->groupR = (buff.st_mode & S_IRGRP) != 0;
-            dirContent->groupW = (buff.st_mode & S_IWGRP) != 0;
-            dirContent->groupX = (buff.st_mode & S_IXGRP) != 0;
-            dirContent->otherR = (buff.st_mode & S_IROTH) != 0;
-            dirContent->otherW = (buff.st_mode & S_IWOTH) != 0;
-            dirContent->otherX = (buff.st_mode & S_IXOTH) != 0;
+
+    // Read each entry an create an fEntry for each
+    while ((file = readdir(workingDir))) {
+
+        // The struct that contains the permissions data on the file
+        struct stat buff;
+
+        // Skips recording the current "." and parent ".." directories
+        if (strcmp(file->d_name, ".") == 0 || strcmp(file->d_name, "..") == 0) {
+            continue; 
         } 
-        // If not, walk to the current end of the list, allocate, then record
-        else {
+        // Records data on the specific file/dir 
+        if (stat(file->d_name, &buff) == 0) {
+            
+            // First element in our Linked List
+            if (dirContent == NULL) {
+                dirContent = (fEntry*)malloc(sizeof(fEntry)); 
+                if (dirContent == NULL) {
+                    fprintf(stderr, "Error: Failed to allocate memory for head of linked list with code %d\n", errno);
+                    exit(-1);
+                }
+                // Record file/dir name
+                strncpy(dirContent->fname, file->d_name, MAX_FOLDER_NAME);
+                dirContent->fname[MAX_FOLDER_NAME-1] = '\0';
 
-            fEntry *lNode = dirContent;
-            while (lNode->next != NULL) {
-                // Increment the length
-                lNode->len++;
-                lNode = lNode->next;
+                // Record rest of the data
+                dirContent->next = NULL;
+                dirContent->isDir = S_ISDIR(buff.st_mode);
+                dirContent->sticky = (buff.st_mode & S_ISVTX) != 0;
+                dirContent->setGID = (buff.st_mode & S_ISGID) != 0;
+                dirContent->setUID = (buff.st_mode & S_ISUID) != 0;
+                dirContent->ownR = (buff.st_mode & S_IRUSR) != 0;
+                dirContent->ownW = (buff.st_mode & S_IWUSR) != 0;
+                dirContent->ownX = (buff.st_mode & S_IXUSR) != 0;
+                dirContent->groupR = (buff.st_mode & S_IRGRP) != 0;
+                dirContent->groupW = (buff.st_mode & S_IWGRP) != 0;
+                dirContent->groupX = (buff.st_mode & S_IXGRP) != 0;
+                dirContent->otherR = (buff.st_mode & S_IROTH) != 0;
+                dirContent->otherW = (buff.st_mode & S_IWOTH) != 0;
+                dirContent->otherX = (buff.st_mode & S_IXOTH) != 0;
+                
+                currentDir.len++;
+                currentFile = dirContent;
             }
-            lNode->len++;
-            lNode->next = malloc(sizeof(fEntry));
 
-            // Check for malloc errors
-            if (lNode->next == NULL) {
-                fprintf(stderr, "Error: Failed to allocate memory for node of linked list with code %d\n", errno);
-                exit(-1);
+            // Now we add any remaining files left in dir to our LinkList 
+            else {
+                fEntry* newFile = (fEntry*)malloc(sizeof(fEntry));
+                if (newFile == NULL) {
+                    fprintf(stderr, "Error: Failed to allocate memory for head of linked list with code %d\n", errno);
+                    exit(-1);
+                }
+
+                // Record file/dir name
+                strncpy(newFile->fname, file->d_name, MAX_FOLDER_NAME);
+                newFile->fname[MAX_FOLDER_NAME-1] = '\0';
+
+                // Record rest of the data
+                newFile->next = NULL;
+                newFile->isDir = S_ISDIR(buff.st_mode);
+                newFile->sticky = (buff.st_mode & S_ISVTX) != 0;
+                newFile->setGID = (buff.st_mode & S_ISGID) != 0;
+                newFile->setUID = (buff.st_mode & S_ISUID) != 0;
+                newFile->ownR = (buff.st_mode & S_IRUSR) != 0;
+                newFile->ownW = (buff.st_mode & S_IWUSR) != 0;
+                newFile->ownX = (buff.st_mode & S_IXUSR) != 0;
+                newFile->groupR = (buff.st_mode & S_IRGRP) != 0;
+                newFile->groupW = (buff.st_mode & S_IWGRP) != 0;
+                newFile->groupX = (buff.st_mode & S_IXGRP) != 0;
+                newFile->otherR = (buff.st_mode & S_IROTH) != 0;
+                newFile->otherW = (buff.st_mode & S_IWOTH) != 0;
+                newFile->otherX = (buff.st_mode & S_IXOTH) != 0;
+
+                currentDir.len++;
+                currentFile->next = newFile;
+                currentFile = newFile;
             }
-            // Record linked list data
-            lNode->next->len = 1;
-            lNode->next->next = NULL;
-            // Record file metadata (copy name; file->d_name is reused by readdir)
-            lNode->next->fname = strdup(file->d_name);
-            if (lNode->next->fname == NULL) {
-                fprintf(stderr, "Error: strdup failed for file name\n");
-                exit(-1);
-            }
-            lNode->next->isDir = S_ISDIR(buff.st_mode);
-            // Record file perms
-            lNode->next->sticky = (buff.st_mode & S_ISVTX) != 0;
-            lNode->next->setGID = (buff.st_mode & S_ISGID) != 0;
-            lNode->next->setUID = (buff.st_mode & S_ISUID) != 0;
-            lNode->next->ownR   = (buff.st_mode & S_IRUSR) != 0;
-            lNode->next->ownW   = (buff.st_mode & S_IWUSR) != 0;
-            lNode->next->ownX   = (buff.st_mode & S_IXUSR) != 0;
-            lNode->next->groupR = (buff.st_mode & S_IRGRP) != 0;
-            lNode->next->groupW = (buff.st_mode & S_IWGRP) != 0;
-            lNode->next->groupX = (buff.st_mode & S_IXGRP) != 0;
-            lNode->next->otherR = (buff.st_mode & S_IROTH) != 0;
-            lNode->next->otherW = (buff.st_mode & S_IWOTH) != 0;
-            lNode->next->otherX = (buff.st_mode & S_IXOTH) != 0;
         }
         
     }    
+    currentDir.start = dirContent;
     closedir(workingDir);
-    return dirContent;
 }
 
-// Frees memory allocated by listDir
-void freeListDir(fEntry* head) {
-    fEntry *current = head;
-    fEntry *next = current->next;
-
-    while (next != NULL) {
-        free(current);
-        current = next;
-        next = next->next;
-    }
-    free(current);
-}
+// Frees memory allocated by the fEntry linked list within our currentDir
 
 // returns string of symbolic permissions of the particular file f
 // Ex. drwxr--r-- means its directory with owner rwx and g and other only r
@@ -212,22 +275,16 @@ char* getFilePermisionsString(fEntry f){
 // Returns string Format of 
 // "file 1 name", "file 1 permissions", ... so on n times
 // n is amount of files in list
-char** getFSMenuOption(fEntry* lHead) {
-    
-    int numFiles = lHead->len;
-
-    char** menuOpts = malloc(2 * numFiles * sizeof(char*));
-    if (menuOpts == NULL && numFiles > 0) {
+char** getFSMenuOption() {
+    char** menuOpts = (char**)malloc(2 * currentDir.len * sizeof(char*));
+    if (menuOpts == NULL && currentDir.len > 0) {
         fprintf(stderr, "Error: malloc failed for menu options\n");
         exit(-1);
     }
     int i = 0; 
-    fEntry *tmp = lHead;
+    fEntry *tmp = currentDir.start;
     while (tmp != NULL){
-        char fileName[MAX_FOLDER_NAME + 1]; 
-           
-        sprintf(fileName, "%s", tmp->fname); 
-        menuOpts[i * 2] = strdup(fileName);
+        menuOpts[i * 2] = strdup(tmp->fname);
         menuOpts[i * 2 + 1] = strdup(getFilePermisionsString(*tmp));
         i++;
         tmp = tmp->next;
@@ -235,34 +292,28 @@ char** getFSMenuOption(fEntry* lHead) {
     return menuOpts;
 }
 
-char* selectFile(char** menuOpts, char* folderName){
-    int status;
-    dialog_state.use_colors = 1;
+void selectFile(char** menuOpts, char* folderName){
+    
     char folderBuf[MAX_FOLDER_NAME];
     snprintf(folderBuf, sizeof(folderBuf), "Select file or directory from\n%s", folderName);
     dlg_clr_result();
-	init_dialog(stdin, stdout);
-    tag_key_attr = tag_attr; 
-    tag_key_selected_attr = tag_selected_attr;
-	status = dialog_menu(
+	dialog_status = dialog_menu(
 			"Selection",
 			folderBuf,
 			0, 
             0,
             0,
-            sizeof(menuOpts),
+            currentDir.len,
             menuOpts
     );
-	end_dialog();
-    // Outupt of the menu
-    return dialog_vars.input_result;
+//	end_dialog();
 
 }
 
 // Returns an fEntry in list dirContent whose fname matches fileName
-fEntry* getFEntryFromString(fEntry* dirContent, char* fileName){
+fEntry* getFEntryFromString(char* fileName){
 
-    fEntry* head = dirContent;
+    fEntry* head = currentDir.start;
     while (head != NULL) {
         if (strcmp(head->fname, fileName) == 0) {
             return head;
@@ -286,7 +337,7 @@ fEntry* getFEntryFromString(fEntry* dirContent, char* fileName){
     */
 // Make sure it actually changes the file permissions
 // returns status of checklist (ok 0, cancel 1, or espace 255)
-int checklistPermissions(fEntry* file){
+void checklistPermissions(fEntry* file){
 
     char* permList[] = {
         "OR", "Owner Read", file->ownR ? "on" : "off",
@@ -307,13 +358,8 @@ int checklistPermissions(fEntry* file){
     char dialogTitle[MAX_FOLDER_NAME + 24];
     snprintf(dialogTitle, MAX_FOLDER_NAME + 24, "Setting Permissions for %s", file->fname);
 
-    int status;
-    dialog_state.use_colors = 1;
     dlg_clr_result();
-	init_dialog(stdin, stdout);
-    tag_key_attr = tag_attr; 
-    tag_key_selected_attr = tag_selected_attr;
-	status = dialog_checklist(
+	dialog_status = dialog_checklist(
 			dialogTitle,
 			"Navigate list: Up and Down Arrows\n Enable/Disable Permission: Space",
 			0, 
@@ -323,41 +369,35 @@ int checklistPermissions(fEntry* file){
             permList,
             FLAG_CHECK
     );
-	end_dialog();
+//	end_dialog();
 
     // Set the file's permissions to match their choices
         
+    if (dialog_status == 0) { // Selected OK 
+        mode_t newPerms = 0;
+        // Set owner
+        newPerms += strstr(dialog_vars.input_result, "OR") ? S_IRUSR : 0; 
+        newPerms += strstr(dialog_vars.input_result, "OW") ? S_IWUSR : 0; 
+        newPerms += strstr(dialog_vars.input_result, "OX") ? S_IXUSR : 0; 
+        // Set group
+        newPerms += strstr(dialog_vars.input_result, "GR") ? S_IRGRP : 0; 
+        newPerms += strstr(dialog_vars.input_result, "GW") ? S_IWGRP : 0; 
+        newPerms += strstr(dialog_vars.input_result, "GX") ? S_IXGRP : 0; 
+        // Set other
+        newPerms += strstr(dialog_vars.input_result, "TR") ? S_IROTH : 0; 
+        newPerms += strstr(dialog_vars.input_result, "TW") ? S_IWOTH : 0; 
+        newPerms += strstr(dialog_vars.input_result, "TX") ? S_IXOTH : 0; 
+        // Set special
+        newPerms += strstr(dialog_vars.input_result, "SU") ? S_ISUID : 0; 
+        newPerms += strstr(dialog_vars.input_result, "SG") ? S_ISGID : 0; 
+        newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
 
-    mode_t newPerms = 0;
-    // Set owner
-    newPerms += strstr(dialog_vars.input_result, "OR") ? S_IRUSR : 0; 
-    newPerms += strstr(dialog_vars.input_result, "OW") ? S_IWUSR : 0; 
-    newPerms += strstr(dialog_vars.input_result, "OX") ? S_IXUSR : 0; 
-    // Set group
-    newPerms += strstr(dialog_vars.input_result, "GR") ? S_IRGRP : 0; 
-    newPerms += strstr(dialog_vars.input_result, "GW") ? S_IWGRP : 0; 
-    newPerms += strstr(dialog_vars.input_result, "GX") ? S_IXGRP : 0; 
-    // Set other
-    newPerms += strstr(dialog_vars.input_result, "TR") ? S_IROTH : 0; 
-    newPerms += strstr(dialog_vars.input_result, "TW") ? S_IWOTH : 0; 
-    newPerms += strstr(dialog_vars.input_result, "TX") ? S_IXOTH : 0; 
-    // Set special
-    newPerms += strstr(dialog_vars.input_result, "SU") ? S_ISUID : 0; 
-    newPerms += strstr(dialog_vars.input_result, "SG") ? S_ISGID : 0; 
-    newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
-
-    chmod(file->fname, newPerms);
-    return status;
-
-}
-
-//TODO:
-// Go into the directroy of the file
-// Maybe check if it is dir but 
-void goIntoDir(fEntry* file){
-
+        // What actually changes file permission within your system
+        chmod(file->fname, newPerms);
+    }
 
 }
+
 
 
 void freeMenuOpts(char** menuOpts){
@@ -367,93 +407,64 @@ void freeMenuOpts(char** menuOpts){
     free(menuOpts);
 }
 
-void freelsDir(fEntry* lHead){
-
-
-}
-
-//Takes a path and returns the end most folder (or file)
-//Ex:
-// getCurrentFolder(/Users/alex/Desktop/work) returns work
-char* getCurrentFolder(char* folderPath){
-    return strrchr(folderPath, '/') + 1; 
-}
-
-//Takes path and returns the same path but with just the parent
-//Ex:
-//  getParentPath(/Users/alex/Desktop/work) returns /Users/alex/Desktop
-/*
-char* getParentPath(char* folderPath){
-    int end = strrchr(folderPath, '/') - folderPath;
-    char ans[end+1];
-    strncpy(ans, folderPath, end);     
-    ans[end+1] = '\0';
-    return ans;
-}
-*/
 
 
 int main() {
-    /*
-    char *pwd = malloc(MAX_PATH_LENGTH);
-    printf("fpMod starting in directory %s\n", pwd);
     
-    // Get the current working directory
-    if (getcwd(pwd, MAX_FOLDER_NAME) == NULL) {
-        fprintf(stderr, "Error: Could not read the pwd with code %d\n", errno);
-        exit(-1);
-    }
-
-    // Retrieve and list the files in the current directory
-    fEntry* dirContents = listDir(pwd);
-    // Gathering file names in menu string array format
-    // Need size for the menu
-    char** menuOpts = getFSMenuOption(dirContents);
-    int menuSize = dirContents->len;
-
-    char* outputFile = selectFile(menuOpts, menuSize);
-    checklistPermissions(getFEntryFromString(dirContents, outputFile));
-    */
-
-    ///THE FLOW
-   
     char *pwd = malloc(MAX_PATH_LENGTH);
     if (getcwd(pwd, MAX_PATH_LENGTH) == NULL) {
         fprintf(stderr, "Error: Could not read the pwd with code %d\n", errno);
         exit(-1);
     }
-    fEntry* lsHead = listDir(pwd);
-    char** menuOpts = getFSMenuOption(lsHead);
-    char* fileName = malloc(MAX_FOLDER_NAME);
-    char* folderName = malloc(MAX_FOLDER_NAME);
-    while(1){
-        strcpy(folderName, getCurrentFolder(pwd));
-        strcpy(fileName,selectFile(menuOpts, folderName)); //creates the menu
-        printf("%s\n", fileName); 
-        if (fileName == NULL){ //User selects cancel
-            printf("Exited\n");
-            break;
-        }
- 
-        
-        fEntry* selectedFile = getFEntryFromString(lsHead, fileName);
- 
-        if (!selectedFile->isDir){ //User selects file
-            int result = checklistPermissions(selectedFile);
-            printf("%s\n", dialog_vars.input_result);
-        }
-        if (selectedFile->isDir && !strcmp(selectedFile->fname, ".")){// User Selects Current Dir
-            // Parse the pwd to get just the name fo current dir
-            checklistPermissions(getFEntryFromString(lsHead, "."));
-        }
-        else{ //User selects a dir (go into that dir) (if .. go up a dir)
-            // change pwd to absoloute path of parent
-            //closedir(lsDir);
-            freeMenuOpts(menuOpts);
-            lsHead = listDir(pwd);
-            menuOpts = getFSMenuOption(lsHead);
+    updateDirEntry(pwd);
+    char** menuOpts;
+    char* folderName = getCurrentFolder(pwd);
+    fEntry* selectedFile;
+
+    init_dialog(stdin, stdout);
+    DialogState currentState = MENU_STATE;
+    dialog_state.use_colors = 1;
+    tag_key_attr = tag_attr; 
+    tag_key_selected_attr = tag_selected_attr;
+
+    while (currentState != QUIT_STATE){
+
+
+        dlg_clear();
+        switch (currentState) {
+
+            case MENU_STATE: {
+                menuOpts = getFSMenuOption();
+                selectFile(menuOpts, folderName);
+                if (dialog_status == 0 ) { // Selected OK
+                    selectedFile = getFEntryFromString(dialog_vars.input_result); 
+                    currentState = CHECKLIST_STATE;
+                }
+                else { // Selected CANCEL
+                    currentState = QUIT_STATE;
+                }
+                break;
+            }
+
+            case CHECKLIST_STATE: {
+                checklistPermissions(selectedFile);
+                if (dialog_status == 0) { // Selected OK
+                   currentState = MENU_STATE; 
+                   updateDirEntry(pwd);
+                }
+                else { // Selected CANCEL
+                    currentState = MENU_STATE;
+                }
+                break;
+            }
+            default: {
+                currentState = QUIT_STATE;
+                break;
+            }
         }
     }
+    end_dialog();
+    //free(folderName);
     return 0;
 
 }
