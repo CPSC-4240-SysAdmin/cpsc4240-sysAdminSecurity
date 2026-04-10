@@ -306,7 +306,6 @@ void selectFile(char** menuOpts, char* folderName){
             currentDir.len,
             menuOpts
     );
-//	end_dialog();
 
 }
 
@@ -369,7 +368,6 @@ void checklistPermissions(fEntry* file){
             permList,
             FLAG_CHECK
     );
-//	end_dialog();
 
     // Set the file's permissions to match their choices
         
@@ -393,7 +391,7 @@ void checklistPermissions(fEntry* file){
         newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
 
         // What actually changes file permission within your system
-        int success = chmod(file->fname, newPerms);
+        chmod(file->fname, newPerms);
     }
 
 }
@@ -416,9 +414,10 @@ int main() {
         fprintf(stderr, "Error: Could not read the pwd with code %d\n", errno);
         exit(-1);
     }
+    // Fill the currentDir data
     updateDirEntry(pwd);
     char** menuOpts;
-    char* folderName = getCurrentFolder(pwd);
+    char* folderName = currentDir.dirName;
     fEntry* selectedFile;
 
     init_dialog(stdin, stdout);
@@ -466,7 +465,6 @@ int main() {
     free(menuOpts);
     freeDirEntry();
     end_dialog();
-    //free(folderName);
     return 0;
 
 }
