@@ -1,12 +1,12 @@
 compile: 
-	gcc main.c -ldialog -lncursesw -lm -g -o fpMod
+	gcc main.c -ldialog -lncursesw -lm -g -o permod
 
 # For compulation on MacOs where libraries are installed via brew
 mcompile:
-	gcc main.c -I/opt/homebrew/include -L/opt/homebrew/lib -ldialog -lncurses -g -o fpMod 
+	gcc main.c -I/opt/homebrew/include -L/opt/homebrew/lib -ldialog -lncurses -g -o permod
 
 run: 
-	./fpMod
+	./permod
 
 clean:
-	rm fpMod
+	rm permod
