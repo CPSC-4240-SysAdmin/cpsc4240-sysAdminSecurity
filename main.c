@@ -393,7 +393,7 @@ void checklistPermissions(fEntry* file){
         newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
 
         // What actually changes file permission within your system
-        chmod(file->fname, newPerms);
+        int success = chmod(file->fname, newPerms);
     }
 
 }
@@ -463,6 +463,8 @@ int main() {
             }
         }
     }
+    free(menuOpts);
+    freeDirEntry();
     end_dialog();
     //free(folderName);
     return 0;
