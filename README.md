@@ -21,5 +21,3 @@ In the directory run
 make mcompile
 ~~~
 
-
-## Installing on Windows
