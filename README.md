@@ -2,10 +2,10 @@
 
 The wonderful file and directory permissions GUI, straight from your terminal!!
 These are the dependencies
-make
-gcc
-dialog
-libncurses-dev
++ make
++ gcc
++ dialog
++ libncurses-dev
 
 ## Installing on Linux
 To compile on linux make sure those packages are installed
