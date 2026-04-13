@@ -335,8 +335,9 @@ fEntry* getFEntryFromString(char* fileName){
     *special Permissions[]
     */
 // Make sure it actually changes the file permissions
-// returns status of checklist (ok 0, cancel 1, or espace 255)
-void checklistPermissions(fEntry* file){
+// returns status chmod, 0 if success, -1 if failure(lack of priviledge to change permission 
+// or file not there)
+int checklistPermissions(fEntry* file){
 
     char* permList[] = {
         "OR", "Owner Read", file->ownR ? "on" : "off",
@@ -391,9 +392,14 @@ void checklistPermissions(fEntry* file){
         newPerms += strstr(dialog_vars.input_result, "ST") ? S_ISVTX : 0;
 
         // What actually changes file permission within your system
-        chmod(file->fname, newPerms);
+        if(chmod(file->fname, newPerms) == 0){
+            return 0;
+        }
+        if (errno == EPERM){
+            return -1;
+        }
     }
-
+    return -1;
 }
 
 
@@ -403,6 +409,11 @@ void freeMenuOpts(char** menuOpts){
         free(menuOpts[i]);
     }
     free(menuOpts);
+}
+
+
+void permissionPopUp(){
+    dialog_msgbox("Permissions Needed", "Not authorized to change permissions for this file/directory\n", 0, 0, 1);
 }
 
 
@@ -419,6 +430,7 @@ int main() {
     char** menuOpts;
     char* folderName = currentDir.dirName;
     fEntry* selectedFile;
+    int validPerm;
 
     init_dialog(stdin, stdout);
     DialogState currentState = MENU_STATE;
@@ -446,10 +458,16 @@ int main() {
             }
 
             case CHECKLIST_STATE: {
-                checklistPermissions(selectedFile);
+                validPerm = checklistPermissions(selectedFile);
                 if (dialog_status == 0) { // Selected OK
-                   currentState = MENU_STATE; 
-                   updateDirEntry(pwd);
+                    if (validPerm == 0) { 
+                        currentState = MENU_STATE; 
+                        updateDirEntry(pwd);
+                    }
+                    else{
+                        permissionPopUp();     
+                        currentState = MENU_STATE;
+                    }
                 }
                 else { // Selected CANCEL
                     currentState = MENU_STATE;
